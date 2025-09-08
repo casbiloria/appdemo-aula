@@ -32,7 +32,8 @@ function getIpAddress() {
   }
   return 'Endereço IP não encontrado';
 }
-
+console.log("TESTE WEBHOOK"):
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost:${port}`);
 });
+
