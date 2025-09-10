@@ -38,15 +38,10 @@ jobs:
           scp -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
           -r ${{ github.workspace }}/* ubuntu@${{ secrets.HOST }}:/home/ubuntu/app
 
-      - name: Instalar dependências
-        run: |
-          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-          ubuntu@${{ secrets.HOST }} "sudo npm install --prefix /home/ubuntu/app"
-
       - name: Reiniciar serviço
         run: |
           ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-          ubuntu@${{ secrets.HOST }} "sudo systemctl restart appdemo1.service"
+          ubuntu@${{ secrets.HOST }} "sudo systemctl restart app.service"
 
       - name: Remover chave temporária
         run: rm /tmp/private_key
