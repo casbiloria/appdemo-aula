@@ -1,62 +1,66 @@
 name: Publicação automática
-on:  
-  # nosso script será executado sempre quando houver push e pull request nas branches destacadas abaixo
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
 jobs:
-  build:
-    # sistema operacional da máquina que o Github irá disponibilizar para rodar o nosso script
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-    # aqui é iniciado o passo a passo para realizar o processo de publicação
-    steps:
-      - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v3
 
-      - name: Cria um arquivo temporário para a chave privada e altera a permissão do arquivo para que só o dono possa ler e escrever (necessário para chaves)
-        run: |
-               echo "${{ secrets.KEY }}" > /tmp/private_key
-               chmod 600 /tmp/private_key
+      - name: Cria um arquivo temporário para a chave privada
+        run: |
+          echo "${{ secrets.KEY }}" > /tmp/private_key
+          chmod 600 /tmp/private_key
 
-      - name: Criando a pasta da aplicação e acertando diretório... 
-        # StrictHostKeyChecking: desativar prompt 'fingerprint'
-        # UserKnownHostsFile: para não salvar a chave
-        run: |
-               ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${{ secrets.HOST }} \
-               sudo mkdir -p /home/ubuntu/app 
+      - name: Criando a pasta da aplicação
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          ubuntu@${{ secrets.HOST }} "sudo mkdir -p /home/ubuntu/app"
 
-      - name: Ajustar permissões no servidor de Produção
-        run: |
-          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${{ secrets.HOST }} "sudo chown -R ubuntu:ubuntu /home/ubuntu/app && sudo chmod -R 755 /home/ubuntu/app"
+      - name: Ajustar permissões no servidor
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          ubuntu@${{ secrets.HOST }} "sudo chown -R ubuntu:ubuntu /home/ubuntu/app && sudo chmod -R 755 /home/ubuntu/app"
 
-      - name: Criando um backup da pasta da aplicação em arquivo .zip
-        run: |
-          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${{ secrets.HOST }} "sudo zip -r /home/ubuntu/app-backup-$(date +%Y-%m-%d).zip /home/ubuntu/app"
+      - name: Backup da pasta da aplicação
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          ubuntu@${{ secrets.HOST }} "sudo zip -r /home/ubuntu/app-backup-$(date +%Y-%m-%d).zip /home/ubuntu/app"
 
-      - name: Transferindo os arquivos da aplicação
-        run: |
-               scp -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -r ${{ github.workspace }}/* ubuntu@${{ secrets.HOST }}:/home/ubuntu/app
+      - name: Transferir arquivos
+        run: |
+          scp -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          -r ${{ github.workspace }}/* ubuntu@${{ secrets.HOST }}:/home/ubuntu/app
 
-      - name: Reiniciando o serviço da aplicação
-        run: |
-               ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${{ secrets.HOST }} \
-               sudo systemctl restart appdemo1.service
+      - name: Instalar dependências
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          ubuntu@${{ secrets.HOST }} "sudo npm install --prefix /home/ubuntu/app"
 
-      - name: Limpa o arquivo de chave privada após uso
-        run: |
-           rm /tmp/private_key
-           
+      - name: Reiniciar serviço
+        run: |
+          ssh -i /tmp/private_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          ubuntu@${{ secrets.HOST }} "sudo systemctl restart appdemo1.service"
+
+      - name: Remover chave temporária
+        run: rm /tmp/private_key
+
       - name: Notificação de sucesso no Discord
         if: success()
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data '{"content": "Deploy realizado com sucesso!"}' \
+          --data '{"content": "✅ Deploy realizado com sucesso!"}' \
           ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Notificação de falha no Discord
         if: failure()
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data '{"content": "O deploy falhou. Verifique os logs do GitHub Actions."}' \
+          --data '{"content": "❌ O deploy falhou. Verifique os logs do GitHub Actions."}' \
           ${{ secrets.DISCORD_WEBHOOK_URL }}
